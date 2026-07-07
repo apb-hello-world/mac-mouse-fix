@@ -190,6 +190,14 @@ static NSMutableDictionary *_swipeInfo;
         ///     The `d` input args are already pre-flipped by `ModifiedDrag.m` if `invertedFromDevice == true`. But the macOS 27 path applies the flipping by itself somehow.
         double __dockSwipeOriginOffset = _dockSwipeOriginOffset;
         if (invertedFromDevice) __dockSwipeOriginOffset *= -1; /// Could also apply the unflipping to the `d` argument above.
+        double __exitSpeed = exitSpeed;
+        
+        /// SLEventSetIOHIDEvent interprets horizontal DockSwipe progress in the opposite
+        /// direction from the old CGEvent field path. Keep the established MMF behavior.
+        if (type == kMFDockSwipeTypeHorizontal) {
+            __dockSwipeOriginOffset *= -1;
+            __exitSpeed *= -1;
+        }
         
         /// Create HIDEvent
         ///     Note: Setting the timestamp to `mach_absolute_time()` here would make some sense but we're not setting timestamps anywhere else when simulating gestures
@@ -207,8 +215,8 @@ static NSMutableDictionary *_swipeInfo;
             
             HIDEvent *childEvent = [[HIDEvent alloc] initWithType: kIOHIDEventTypeVelocity timestamp: 0 senderID: 0];
             
-            [childEvent setDoubleValue: exitSpeed forField: kIOHIDEventFieldVelocityX];
-            [childEvent setDoubleValue: exitSpeed forField: kIOHIDEventFieldVelocityY];
+            [childEvent setDoubleValue: __exitSpeed forField: kIOHIDEventFieldVelocityX];
+            [childEvent setDoubleValue: __exitSpeed forField: kIOHIDEventFieldVelocityY];
             [childEvent setDoubleValue: 0.0       forField: kIOHIDEventFieldVelocityZ];
             
             [hidEvent appendEvent: childEvent];
@@ -376,4 +384,3 @@ static NSMutableDictionary *_swipeInfo;
 
 
 @end
-
