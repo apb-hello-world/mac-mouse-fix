@@ -314,6 +314,18 @@
         }
       }
     },
+    "dDh-nq-zbN.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Quit Mac Mouse Fix\"; ObjectID = \"dDh-nq-zbN\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Quit Mac Mouse Fix"
+          }
+        }
+      }
+    },
     "MGH-3e-48B.title" : {
       "comment" : "Class = \"NSMenuItem\"; title = \"<App Compat title>\"; ObjectID = \"MGH-3e-48B\";",
       "extractionState" : "extracted_with_value",

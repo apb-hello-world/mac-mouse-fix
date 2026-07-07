@@ -129,6 +129,10 @@ import Foundation
         HelperUtility.openMainApp()
     }
     
+    @IBAction func quitMMF(_ sender: Any) {
+        HelperServices.disableHelperFromHelper()
+    }
+
     @IBAction func disableScroll(_ sender: NSMenuItem) {
         
         // TODO: Fix bug where scrolling freezes after turning smooth scroll back on
