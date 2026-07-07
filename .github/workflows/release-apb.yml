@@ -128,18 +128,35 @@ jobs:
           base_display="${{ steps.meta.outputs.base_display }}"
           apb_number="${{ steps.meta.outputs.apb_number }}"
 
-          if git rev-parse -q --verify "refs/tags/${base_tag}" >/dev/null; then
+          git remote add upstream https://github.com/noah-nuebling/mac-mouse-fix.git 2>/dev/null || true
+          git fetch --quiet upstream master --tags
+
+          if git rev-parse -q --verify "refs/remotes/upstream/master" >/dev/null; then
+            range="upstream/master..HEAD"
+          elif git rev-parse -q --verify "refs/tags/${base_tag}" >/dev/null; then
             range="${base_tag}..HEAD"
           else
             range="HEAD"
           fi
+
+          downstream_changes="$(
+            git log --no-merges --pretty='- %s (%h)' "$range" \
+              | sed \
+                -e '/^- GitHub Actions Workflow automatically regenerated/d' \
+                -e '/^- Add APB release workflow /d' \
+                -e '/^- Use macOS 26 runner for APB releases /d' \
+                -e '/^- Fix APB dSYM packaging /d' \
+                -e '/^- Refine APB release notes /d'
+          )"
 
           {
             echo "Mac Mouse Fix **${base_display} APB ${apb_number}** is a downstream build of Mac Mouse Fix for the apb-hello-world fork."
             echo
             echo "### Downstream changes"
             echo
-            if ! git log --no-merges --pretty='- %s (%h)' "$range" | sed '/^- GitHub Actions Workflow automatically regenerated/d'; then
+            if [[ -n "$downstream_changes" ]]; then
+              echo "$downstream_changes"
+            else
               echo "- Downstream build from ${tag}."
             fi
             echo
