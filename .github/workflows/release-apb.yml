@@ -1,0 +1,161 @@
+name: APB Release
+
+on:
+  push:
+    tags:
+      - "*-apb.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Select Xcode
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for candidate in /Applications/Xcode_26.6.app /Applications/Xcode_26.5.app /Applications/Xcode_26.app /Applications/Xcode.app; do
+            if [[ -d "$candidate" ]]; then
+              sudo xcode-select -s "$candidate/Contents/Developer"
+              break
+            fi
+          done
+
+          xcodebuild -version
+
+      - name: Derive release metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="${GITHUB_REF_NAME}"
+          base_tag="${tag%-apb.*}"
+          apb_number="${tag##*-apb.}"
+          base_display="$(printf '%s' "$base_tag" | sed -E 's/-Beta-/ Beta /g')"
+          release_name="${base_display} APB ${apb_number}"
+
+          {
+            echo "tag=${tag}"
+            echo "base_tag=${base_tag}"
+            echo "base_display=${base_display}"
+            echo "apb_number=${apb_number}"
+            echo "release_name=${release_name}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build release app
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          xcodebuild \
+            -project "Mouse Fix.xcodeproj" \
+            -scheme "App - Release" \
+            -configuration Release \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -destination "platform=macOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Package app and dSYMs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          products="$RUNNER_TEMP/DerivedData/Build/Products/Release"
+          dist="$RUNNER_TEMP/dist"
+          stage="$RUNNER_TEMP/stage"
+
+          rm -rf "$dist" "$stage"
+          mkdir -p "$dist" "$stage"
+
+          ditto --norsrc --noextattr "$products/Mac Mouse Fix.app" "$stage/Mac Mouse Fix.app"
+          xattr -d -r com.apple.FinderInfo "$stage/Mac Mouse Fix.app" 2>/dev/null || true
+          xattr -cr "$stage/Mac Mouse Fix.app" || true
+
+          codesign --force --deep --sign - "$stage/Mac Mouse Fix.app"
+          codesign --verify --deep --strict --verbose=2 "$stage/Mac Mouse Fix.app"
+
+          (
+            cd "$stage"
+            ditto -c -k --keepParent "Mac Mouse Fix.app" "$dist/MacMouseFixApp.zip"
+          )
+
+          dsyms=()
+          while IFS= read -r dsym; do
+            dsyms+=("$dsym")
+          done < <(find "$products" -maxdepth 1 -name "*.dSYM" -print)
+          if (( ${#dsyms[@]} > 0 )); then
+            ditto -c -k --keepParent "${dsyms[@]}" "$dist/dSYMs.zip"
+          else
+            mkdir -p "$stage/empty-dSYMs"
+            ditto -c -k --keepParent "$stage/empty-dSYMs" "$dist/dSYMs.zip"
+          fi
+
+          ls -lh "$dist"
+
+      - name: Write release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="${{ steps.meta.outputs.tag }}"
+          base_tag="${{ steps.meta.outputs.base_tag }}"
+          base_display="${{ steps.meta.outputs.base_display }}"
+          apb_number="${{ steps.meta.outputs.apb_number }}"
+
+          if git rev-parse -q --verify "refs/tags/${base_tag}" >/dev/null; then
+            range="${base_tag}..HEAD"
+          else
+            range="HEAD"
+          fi
+
+          {
+            echo "Mac Mouse Fix **${base_display} APB ${apb_number}** is a downstream build of Mac Mouse Fix for the apb-hello-world fork."
+            echo
+            echo "### Downstream changes"
+            echo
+            if ! git log --no-merges --pretty='- %s (%h)' "$range" | sed '/^- GitHub Actions Workflow automatically regenerated/d'; then
+              echo "- Downstream build from ${tag}."
+            fi
+            echo
+            echo "### Upstream base"
+            echo
+            echo "Based on [noah-nuebling/mac-mouse-fix ${base_display}](https://github.com/noah-nuebling/mac-mouse-fix/releases/tag/${base_tag})."
+            echo
+            echo "### Assets"
+            echo
+            echo "- \`MacMouseFixApp.zip\`: drag \`Mac Mouse Fix.app\` into Applications."
+            echo "- \`dSYMs.zip\`: debug symbols for this build."
+            echo
+            echo "> Note: This fork build is ad-hoc signed by GitHub Actions, not notarized with Noah Nuebling's Apple Developer credentials."
+          } > "$RUNNER_TEMP/release-notes.md"
+
+          cat "$RUNNER_TEMP/release-notes.md"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gh release create "${{ steps.meta.outputs.tag }}" \
+            "$RUNNER_TEMP/dist/MacMouseFixApp.zip" \
+            "$RUNNER_TEMP/dist/dSYMs.zip" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${{ steps.meta.outputs.release_name }}" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            --prerelease
