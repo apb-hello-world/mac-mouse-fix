@@ -103,7 +103,14 @@ jobs:
             dsyms+=("$dsym")
           done < <(find "$products" -maxdepth 1 -name "*.dSYM" -print)
           if (( ${#dsyms[@]} > 0 )); then
-            ditto -c -k --keepParent "${dsyms[@]}" "$dist/dSYMs.zip"
+            mkdir -p "$stage/dSYMs"
+            for dsym in "${dsyms[@]}"; do
+              ditto --norsrc --noextattr "$dsym" "$stage/dSYMs/$(basename "$dsym")"
+            done
+            (
+              cd "$stage/dSYMs"
+              ditto -c -k . "$dist/dSYMs.zip"
+            )
           else
             mkdir -p "$stage/empty-dSYMs"
             ditto -c -k --keepParent "$stage/empty-dSYMs" "$dist/dSYMs.zip"
