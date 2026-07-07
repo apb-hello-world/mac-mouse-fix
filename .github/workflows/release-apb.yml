@@ -11,7 +11,7 @@ permissions:
 jobs:
   release:
     name: Build and publish release
-    runs-on: macos-latest
+    runs-on: macos-26
 
     steps:
       - name: Check out repository
@@ -33,6 +33,11 @@ jobs:
           done
 
           xcodebuild -version
+          xcode_major="$(xcodebuild -version | awk '/^Xcode / { split($2, version, "."); print version[1] }')"
+          if [[ "$xcode_major" != "26" ]]; then
+            echo "This release workflow requires Xcode 26. GitHub selected Xcode ${xcode_major:-unknown}." >&2
+            exit 1
+          fi
 
       - name: Derive release metadata
         id: meta
