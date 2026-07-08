@@ -62,13 +62,6 @@
                         <action selector="openMMF:" target="-2" id="8UO-6A-hAp"/>
                     </connections>
                 </menuItem>
-                <menuItem isSeparatorItem="YES" id="PmV-5u-CvR"/>
-                <menuItem title="Quit Mac Mouse Fix" id="dDh-nq-zbN">
-                    <modifierMask key="keyEquivalentModifierMask"/>
-                    <connections>
-                        <action selector="quitMMF:" target="-2" id="j6q-Ff-rVI"/>
-                    </connections>
-                </menuItem>
             </items>
             <point key="canvasLocation" x="-11" y="44"/>
         </menu>
